@@ -1,5 +1,18 @@
 !include MUI2.nsh
 !include FileFunc.nsh
+!define MUI_ICON "..\${app_name}\Icon.ico"      ;Install icon
+!define MUI_UNICON "..\${app_name}\Icon.ico"    ;Uninstall icon
+
+;extract individual parts of version to prefixed variables
+!getdllversion "..\${app_name}\${app_name}.exe" ver
+!define WIN_VERSION "${ver1}.${ver2}.${ver3}.${ver4}"
+
+VIProductVersion "${WIN_VERSION}"
+VIAddVersionKey "ProductName" "${app_name}"
+VIAddVersionKey "FileVersion" "${WIN_VERSION}"
+VIAddVersionKey "ProductVersion" "${WIN_VERSION}"
+VIAddVersionKey "LegalCopyright" "(C) ${author}"
+VIAddVersionKey "FileDescription" "${app_name}"
 
 ;--------------------------------
 ;Perform Machine-level install, if possible
@@ -49,7 +62,7 @@ FunctionEnd
     !define MUI_FINISHPAGE_RUN
     !define MUI_FINISHPAGE_RUN_CHECKED
     !define MUI_FINISHPAGE_RUN_TEXT "Run ${app_name}"
-;    !define MUI_FINISHPAGE_RUN_FUNCTION "LaunchLink"
+    !define MUI_FINISHPAGE_RUN_FUNCTION "LaunchAsNonAdmin"
   !insertmacro MUI_PAGE_FINISH
 
   !insertmacro MUI_UNPAGE_CONFIRM
@@ -77,15 +90,19 @@ Section
   WriteRegStr SHCTX "${UNINST_KEY}" "QuietUninstallString" \
     "$\"$InstDir\uninstall.exe$\" /$MultiUser.InstallMode /S"
   WriteRegStr SHCTX "${UNINST_KEY}" "Publisher" "${author}"
+  WriteRegStr SHCTX "${UNINST_KEY}" "DisplayIcon" "$InstDir\uninstall.exe"
+  ; NOTE: GetSize supposedly superseded by Locate plugin, watch for future removal
+  ; https://nsis.sourceforge.io/Locate_plugin
   ${GetSize} "$InstDir" "/S=0K" $0 $1 $2
   IntFmt $0 "0x%08X" $0
   WriteRegDWORD SHCTX "${UNINST_KEY}" "EstimatedSize" "$0"
+  WriteRegStr SHCTX "${UNINST_KEY}" "DisplayVersion" "${WIN_VERSION}"
+  ; TODO: Investigate VersionConvert etc. The following will blow up if major/minor version is non-numeric.
+  ; fbs forces numeric versioning but PyInstaller might not.
+  WriteRegDWORD SHCTX "${UNINST_KEY}" "VersionMajor" "${ver1}"
+  WriteRegDWORD SHCTX "${UNINST_KEY}" "VersionMinor" "${ver2}"
 
 SectionEnd
-
-Function .onVerifyInstDir
-  StrCpy $InstDir "$InstDir\${app_name}"
-FunctionEnd
 
 ;--------------------------------
 ;Uninstaller Section
@@ -99,7 +116,12 @@ Section "Uninstall"
 
 SectionEnd
 
-; Function LaunchLink
-;   !addplugindir "."
-;   ShellExecAsUser::ShellExecAsUser "open" "$SMPROGRAMS\${app_name}.lnk"
-; FunctionEnd
+;--------------------------------
+;Additional Functions
+Function .onVerifyInstDir
+  StrCpy $InstDir "$InstDir\${app_name}"
+FunctionEnd
+
+Function LaunchAsNonAdmin
+  Exec '"$WINDIR\explorer.exe" "$InstDir\${app_name}.exe"'
+FunctionEnd

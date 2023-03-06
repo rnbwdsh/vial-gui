@@ -100,7 +100,7 @@ jobs:
     - name: Build
       run: |
         . .\venv\Scripts\activate.ps1
-        fbs freeze	
+        fbs freeze
         Compress-Archive -Path "target\Vial" -DestinationPath vial-win.zip
 
     - uses: actions/upload-artifact@v1
